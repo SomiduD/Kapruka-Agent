@@ -88,8 +88,8 @@ function fastAnalyse(message: string): Intent {
     maxPrice = parseInt(betweenMatch[2].replace(/,/g, ""));
   }
 
-  // Strip filler words
-  const FILLERS = /\b(buy|get|find|search for|show me|show|want|need|looking for|i want|i need|give me|can you|please|help me find|i am looking for|i need to buy|i want to buy)\b/gi;
+  // Strip filler words (including common Singlish and Tamilish words as a fallback)
+  const FILLERS = /\b(buy|get|find|search for|show me|show|want|need|looking for|i want|i need|give me|can you|please|help me find|i am looking for|i need to buy|i want to buy|mata|ekak|oni|ona|hoda|lassana|labeta|apata|tiyeda|tiyenawa|ganna|enakku|vendum|venum|pookal|nalla|laabamaana|irukkiṟathā|irukada)\b/gi;
   const SORT_WORDS = /\b(cheap|cheapest|affordable|budget|premium|luxury|expensive|best rated|top rated|popular|newest|latest|recent|best quality)\b/gi;
   const PRICE_PHRASES = /(?:under|above|below|between)\s+(?:rs\.?\s*|lkr\s*)?[\d,]+(?:\s+and\s+(?:rs\.?\s*|lkr\s*)?[\d,]+)?/gi;
 
@@ -107,7 +107,7 @@ function fastAnalyse(message: string): Intent {
 async function analyseIntent(message: string, isDirectCategory = false): Promise<Intent> {
   const msg = message.toLowerCase().trim();
 
-  // Exact UI chip match → bypass everything
+  // Exact UI chip match → bypass LLM entirely
   const exactQuery = EXACT_CATEGORY_QUERIES[msg];
   if (exactQuery || isDirectCategory) {
     return {
@@ -117,22 +117,21 @@ async function analyseIntent(message: string, isDirectCategory = false): Promise
     };
   }
 
-  // Pure ASCII → use fast regex, skip LLM call entirely
-  if (!HAS_NON_ASCII.test(message)) {
-    return fastAnalyse(message);
-  }
-
-  // Non-ASCII (Sinhala/Tamil) → use LLM for translation only
+  // Conversational query (English, Sinhala, Tamil, Singlish, Tamilish) → Use LLM for high-accuracy translation & parameter extraction
   try {
     const result = await generateText({
       model: google("gemini-1.5-flash"),
-      system: "You are a local Sri Lankan Kapruka shopping agent. You speak English, Sinhala, Singlish, Tamil, and Tamilish. CRITICAL RULE: The Kapruka database ONLY understands English keywords. If a user asks for something in Sinhala or Tamil, you MUST translate the item into a short English keyword (e.g., 'toy') BEFORE calling the tool. NEVER pass Sinhala or Tamil characters into the 'q' parameter.",
+      system: "You are a local Sri Lankan Kapruka shopping agent. You speak English, Sinhala, Singlish, Tamil, and Tamilish.\n" +
+              "CRITICAL RULE: The Kapruka database ONLY understands English keywords.\n" +
+              "If the user asks for products or queries in Sinhala, Singlish (e.g. 'mata cake ekak oni'), Tamil, or Tamilish (e.g. 'enakku chocolate venum'), you MUST translate the item into a clean, short English search keyword (e.g., 'cake', 'chocolate', 'flowers') and pass it to the kapruka_search_products tool.\n" +
+              "NEVER pass non-English characters or transliterated filler words (like 'oni', 'venum', 'vendum', 'ekak') into the 'q' parameter.\n" +
+              "Extract any sorting requests (e.g. 'cheap' -> price_asc, 'premium' -> price_desc) and price limits.",
       messages: [{ role: "user", content: message }],
       tools: {
         kapruka_search_products: {
           description: "Search Kapruka for products",
           parameters: z.object({
-            q: z.string().describe("The translated English search query"),
+            q: z.string().describe("The clean translated English search query"),
             sort: z.enum(["relevance", "price_asc", "price_desc", "rating", "newest"]).optional(),
             minPrice: z.number().optional(),
             maxPrice: z.number().optional(),
@@ -155,7 +154,7 @@ async function analyseIntent(message: string, isDirectCategory = false): Promise
       }
     }
   } catch (e) {
-    console.error("LLM translation failed, falling back to raw text:", e);
+    console.error("LLM translation failed, falling back to fast regex:", e);
   }
 
   return fastAnalyse(message);
@@ -259,6 +258,7 @@ async function trySDKSearch(q: string, sort: SortKey): Promise<any[]> {
     arguments: {
       params: {
         q,
+        limit: 30, // Show more product results (up to 30 instead of default 10)
         sort: sort === "relevance" ? undefined : sort,
         response_format: "json"
       }
@@ -326,6 +326,7 @@ async function tryFetchSearch(q: string, sort: SortKey): Promise<any[]> {
           arguments: {
             params: {
               q,
+              limit: 30, // Show more product results (up to 30 instead of default 10)
               sort: sort === "relevance" ? undefined : sort,
               response_format: "json"
             }
