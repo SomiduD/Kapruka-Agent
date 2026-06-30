@@ -1,3 +1,5 @@
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
@@ -164,10 +166,14 @@ async function analyseIntent(message: string, isDirectCategory = false): Promise
 ───────────────────────────────────────────────────────────────────────────── */
 function normaliseProducts(raw: any[]): any[] {
   return raw.map(p => {
-    const price =
-      typeof p.price === "number"
+    let priceVal = 0;
+    if (p.price && typeof p.price === "object") {
+      priceVal = p.price.amount ?? 0;
+    } else {
+      priceVal = typeof p.price === "number"
         ? p.price
         : parseFloat(String(p.price ?? p.Price ?? 0).replace(/[^0-9.]/g, "")) || 0;
+    }
 
     const id = p.id ?? p.product_id ?? p.productId;
     const slug = p.slug ?? p.url_key ?? undefined;
@@ -180,13 +186,13 @@ function normaliseProducts(raw: any[]): any[] {
     return {
       id,
       name: p.name ?? p.title ?? p.product_name ?? "Unknown Product",
-      price,
-      _numPrice: price,
-      originalPrice: p.originalPrice ?? p.original_price ?? p.mrp ?? undefined,
-      image: p.image ?? p.image_url ?? p.imageUrl ?? p.thumbnail ?? p.img ?? undefined,
+      price: priceVal,
+      _numPrice: priceVal,
+      originalPrice: p.originalPrice ?? p.original_price ?? p.mrp ?? p.compare_at_price?.amount ?? undefined,
+      image: p.image_url ?? p.image ?? p.imageUrl ?? p.thumbnail ?? p.img ?? undefined,
       rating: p.rating ?? p.stars ?? undefined,
       reviewCount: p.reviewCount ?? p.review_count ?? p.reviews ?? undefined,
-      category: p.category ?? p.categoryName ?? undefined,
+      category: p.category && typeof p.category === "object" ? p.category.name : (p.category ?? p.categoryName ?? undefined),
       url,
       discount: p.discount ?? p.discountPercent ?? undefined,
       inStock: p.inStock ?? p.in_stock ?? p.available ?? true,
@@ -216,196 +222,179 @@ function sortProducts(products: any[], sort: SortKey): any[] {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   MCP SEARCH — crash-proof with SSE + JSON-RPC fallbacks
+   MCP SEARCH — SDK primary (handles SSE streaming), fetch fallback
 ───────────────────────────────────────────────────────────────────────────── */
 const MCP_URL = "https://mcp.kapruka.com/mcp";
-const HEADERS_BASE = {
-  "Content-Type": "application/json",
-  "Accept": "application/json, text/event-stream",
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) KaprukaAgent/1.0",
-};
 
-/** Parse SSE stream for the first JSON-RPC result */
-async function parseSSEResponse(text: string): Promise<any[]> {
-  const lines = text.split("\n");
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("data:")) continue;
-    const payload = trimmed.slice(5).trim();
-    if (!payload || payload === "[DONE]") continue;
+/** Universally extract a product array from any MCP result shape */
+function extractProducts(result: any): any[] {
+  if (!result) return [];
+  const text = result?.content?.[0]?.text ?? result?.content?.[0]?.value;
+  if (text && typeof text === "string") {
     try {
-      const parsed = JSON.parse(payload);
-      // JSON-RPC result wrapper
-      if (parsed?.result?.content?.[0]?.text) {
-        const inner = JSON.parse(parsed.result.content[0].text);
-        if (Array.isArray(inner)) return inner;
-        if (Array.isArray(inner?.products)) return inner.products;
-        if (Array.isArray(inner?.items)) return inner.items;
-      }
-      if (Array.isArray(parsed?.result)) return parsed.result;
-      if (Array.isArray(parsed?.result?.products)) return parsed.result.products;
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed?.results)) return parsed.results;
       if (Array.isArray(parsed?.products)) return parsed.products;
-    } catch {
-      // non-JSON SSE frame — skip
-    }
+      if (Array.isArray(parsed?.items)) return parsed.items;
+    } catch { /* not JSON */ }
   }
+  if (Array.isArray(result)) return result;
+  if (Array.isArray(result?.results)) return result.results;
+  if (Array.isArray(result?.products)) return result.products;
+  if (Array.isArray(result?.items)) return result.items;
   return [];
 }
 
-/** Try initialise → tools/call flow to get a proper sessionId from MCP */
-async function tryMCPWithSession(q: string): Promise<any[]> {
-  // Step 1: Initialize
-  const initRes = await fetch(MCP_URL, {
-    method: "POST",
-    headers: HEADERS_BASE,
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      method: "initialize",
-      id: 1,
+/** Method 1: Official MCP SDK — designed for streaming/SSE endpoints */
+async function trySDKSearch(q: string, sort: SortKey): Promise<any[]> {
+  const transport = new StreamableHTTPClientTransport(new URL(MCP_URL));
+  const client = new Client(
+    { name: "kapruka-ai", version: "2.0.0" },
+    { capabilities: {} }
+  );
+  await client.connect(transport);
+  const result = await client.callTool({
+    name: "kapruka_search_products",
+    arguments: {
       params: {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "kapruka-ai", version: "1.0.0" },
-      },
-    }),
+        q,
+        sort: sort === "relevance" ? undefined : sort,
+        response_format: "json"
+      }
+    },
   });
-
-  const initRaw = await initRes.text();
-  let sessionId: string | undefined;
-
-  // Check response header for session
-  sessionId = initRes.headers.get("mcp-session-id") ??
-              initRes.headers.get("x-session-id") ??
-              initRes.headers.get("session-id") ??
-              undefined;
-
-  if (!sessionId) {
-    try {
-      const initData = JSON.parse(initRaw);
-      sessionId = initData?.result?.sessionId ?? initData?.sessionId ?? undefined;
-    } catch { /* SSE response */ }
-  }
-
-  if (!sessionId) {
-    console.log("⚠️ No session ID from initialize, skipping session method");
-    return [];
-  }
-
-  console.log("✅ Got MCP session:", sessionId);
-
-  const toolHeaders: Record<string, string> = {
-    ...HEADERS_BASE,
-    "mcp-session-id": sessionId,
-    "x-session-id": sessionId,
-  };
-
-  // Step 2: Send initialized notification (required by MCP spec)
-  await fetch(MCP_URL, {
-    method: "POST",
-    headers: toolHeaders,
-    body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
-  }).catch(() => {/* ignore */});
-
-  // Step 3: Call the search tool
-  const toolRes = await fetch(MCP_URL, {
-    method: "POST",
-    headers: toolHeaders,
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      method: "tools/call",
-      id: 2,
-      params: { name: "kapruka_search_products", arguments: { q } },
-    }),
-  });
-
-  const toolRaw = await toolRes.text();
-  console.log("🔍 MCP tools/call status:", toolRes.status, "response length:", toolRaw.length);
-
-  // Try JSON parse first
-  try {
-    const data = JSON.parse(toolRaw);
-    if (data?.result?.content?.[0]?.text) {
-      const inner = JSON.parse(data.result.content[0].text);
-      if (Array.isArray(inner)) return inner;
-      if (Array.isArray(inner?.products)) return inner.products;
-    }
-    if (Array.isArray(data?.result)) return data.result;
-    if (Array.isArray(data?.result?.products)) return data.result.products;
-  } catch { /* not JSON */ }
-
-  // Try SSE parse
-  return parseSSEResponse(toolRaw);
+  transport.close().catch(() => {});
+  console.log("🔍 SDK call successful!");
+  return extractProducts(result);
 }
 
-/** Direct JSON-RPC call without session (simplest approach) */
-async function tryDirectCall(q: string): Promise<any[]> {
-  const response = await fetch(MCP_URL, {
-    method: "POST",
-    headers: HEADERS_BASE,
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      method: "tools/call",
-      id: 1,
-      params: { name: "kapruka_search_products", arguments: { q } },
-    }),
-  });
+/** Method 2: Direct fetch with handshake and 15-second AbortSignal timeout */
+async function tryFetchSearch(q: string, sort: SortKey): Promise<any[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  const baseHeaders = {
+    "Content-Type": "application/json",
+    "Accept": "application/json, text/event-stream",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) KaprukaAgent/1.0"
+  };
 
-  const rawText = await response.text();
-
-  if (!response.ok) {
-    console.error(`🚨 HTTP Error [${response.status}]:`, rawText.substring(0, 400));
-    return [];
-  }
-
-  // Try JSON
   try {
-    const data = JSON.parse(rawText);
-    if (data?.result?.content?.[0]?.text) {
-      try {
-        const inner = JSON.parse(data.result.content[0].text);
-        if (Array.isArray(inner)) return inner;
-        if (Array.isArray(inner?.products)) return inner.products;
-        if (Array.isArray(inner?.items)) return inner.items;
-      } catch (e) {
-        console.error("🚨 Failed to parse inner product text:", data.result.content[0].text.substring(0, 200));
-      }
+    // 1. Initialize to obtain session ID
+    const initRes = await fetch(MCP_URL, {
+      method: "POST",
+      headers: baseHeaders,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "initialize",
+        id: 1,
+        params: {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "kapruka-ai-fetch", version: "2.0.0" }
+        }
+      }),
+      signal: controller.signal
+    });
+
+    if (!initRes.ok) {
+      console.error(`🚨 INIT HTTP ${initRes.status}`);
+      clearTimeout(timer);
+      return [];
     }
-    if (data?.result?.products) return data.result.products;
-    if (Array.isArray(data?.result)) return data.result;
-    if (Array.isArray(data?.products)) return data.products;
+
+    const mcpSessionId = initRes.headers.get("mcp-session-id");
+    if (!mcpSessionId) {
+      console.error("🚨 Missing mcp-session-id header from initialize");
+      clearTimeout(timer);
+      return [];
+    }
+
+    // 2. Call the search tool with header and nested arguments
+    const response = await fetch(MCP_URL, {
+      method: "POST",
+      headers: {
+        ...baseHeaders,
+        "Mcp-Session-Id": mcpSessionId
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "tools/call",
+        id: 2,
+        params: {
+          name: "kapruka_search_products",
+          arguments: {
+            params: {
+              q,
+              sort: sort === "relevance" ? undefined : sort,
+              response_format: "json"
+            }
+          }
+        }
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timer);
+    if (!response.ok) {
+      console.error(`🚨 CALL HTTP ${response.status}`);
+      return [];
+    }
+
+    const rawText = await response.text();
+    console.log(`🔍 Fetch MCP status=${response.status} len=${rawText.length}`);
+
+    // Try JSON
+    try {
+      const data = JSON.parse(rawText);
+      const products = extractProducts(data?.result ?? data);
+      if (products.length > 0) return products;
+    } catch { /* not JSON */ }
+
+    // Parse SSE frames
+    for (const line of rawText.split("\n")) {
+      if (!line.trim().startsWith("data:")) continue;
+      const payload = line.trim().slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+      try {
+        const frame = JSON.parse(payload);
+        const products = extractProducts(frame?.result ?? frame);
+        if (products.length > 0) return products;
+      } catch { /* skip */ }
+    }
     return [];
-  } catch {
-    // SSE fallback
-    console.log("ℹ️ Response is SSE, parsing as event-stream…");
-    return parseSSEResponse(rawText);
+  } catch (err: any) {
+    clearTimeout(timer);
+    if (err.name === "AbortError") console.error("🚨 Fetch timed out after 15s");
+    else console.error("🚨 Fetch error:", err.message);
+    return [];
   }
 }
 
 async function searchKapruka(q: string, sort: SortKey = "relevance"): Promise<any[]> {
   console.log("🚀 Kapruka search:", q, "sort:", sort);
-
   let rawProducts: any[] = [];
 
-  // Method 1: Initialize then call (proper MCP session flow)
+  // Method 1: MCP SDK
   try {
-    rawProducts = await tryMCPWithSession(q);
-    if (rawProducts.length > 0) console.log(`✅ Session method: ${rawProducts.length} products`);
+    rawProducts = await trySDKSearch(q, sort);
+    if (rawProducts.length > 0) console.log(`✅ SDK: ${rawProducts.length} products`);
   } catch (e) {
-    console.error("⚠️ Session method failed:", e instanceof Error ? e.message : e);
+    console.error("⚠️ SDK failed:", e instanceof Error ? e.message : String(e));
   }
 
-  // Method 2: Direct JSON-RPC call
+  // Method 2: Handshake fetch fallback
   if (rawProducts.length === 0) {
     try {
-      rawProducts = await tryDirectCall(q);
-      if (rawProducts.length > 0) console.log(`✅ Direct method: ${rawProducts.length} products`);
+      rawProducts = await tryFetchSearch(q, sort);
+      if (rawProducts.length > 0) console.log(`✅ Fetch: ${rawProducts.length} products`);
     } catch (e) {
-      console.error("⚠️ Direct method failed:", e instanceof Error ? e.message : e);
+      console.error("⚠️ Fetch failed:", e instanceof Error ? e.message : String(e));
     }
   }
 
   if (rawProducts.length === 0) {
-    console.log("⚠️ MCP returned 0 products for query:", q);
+    console.warn("⚠️ Both methods returned 0 products for:", q);
     return [];
   }
 
@@ -413,6 +402,8 @@ async function searchKapruka(q: string, sort: SortKey = "relevance"): Promise<an
   const deduped = deduplicateProducts(normed);
   return sortProducts(deduped, sort);
 }
+
+
 
 /* ─────────────────────────────────────────────────────────────────────────────
    API ROUTE
