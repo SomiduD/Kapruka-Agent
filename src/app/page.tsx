@@ -818,88 +818,92 @@ export default function KaprukaChatApp() {
       <style dangerouslySetInnerHTML={{ __html: GLOBAL_CSS }} />
       {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
 
-      <div style={{ display:"flex", flexDirection:"column", height:"100dvh", background:"#f8fafc", overflow:"hidden" }}>
+      <div style={{ display:"flex", flexDirection:"column", height:"100%", background:"#f8fafc", overflow:"hidden" }}>
 
         {/* ── Header ── */}
         <header style={{
-          flexShrink:0, display:"flex", alignItems:"center", justifyContent:"space-between",
-          padding:"10px 12px", background:"rgba(255,255,255,.94)",
+          flexShrink:0, background:"rgba(255,255,255,.94)",
           backdropFilter:"blur(20px)", borderBottom:"1px solid #e8edf3",
           boxShadow:"0 1px 10px rgba(0,0,0,.05)", zIndex:50,
         }}>
-          {/* Left Controls: Logo & Back Button */}
-          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-            {/* Back button (Only on mobile when in chat view) */}
-            {!isEmpty && (
-              <button onClick={() => setMsgs([])} title="Back to Home" style={{
-                background:"#f1f5f9", border:"1px solid #e2e8f0", cursor:"pointer",
-                width:34, height:34, borderRadius:10, display:"flex", alignItems:"center",
-                justifyContent:"center", fontSize:16, marginRight:2
-              }}>⬅️</button>
-            )}
-
-            {/* Logo */}
-            <button onClick={() => setMsgs([])} style={{ display:"flex", alignItems:"center", gap:8, border:"none", background:"none", cursor:"pointer", padding:0 }}>
-              <div style={{ width:34, height:34, borderRadius:10, background:"linear-gradient(135deg,#6366f1,#8b5cf6)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, boxShadow:"0 4px 12px rgba(99,102,241,.35)", flexShrink:0 }}>🛍️</div>
-              <div style={{ textAlign:"left" }} className="hide-mobile">
-                <div style={{ fontSize:15, fontWeight:800, color:"#0f172a", lineHeight:1.1 }}>
-                  Kapruka <span style={{ background:"linear-gradient(135deg,#6366f1,#a78bfa,#ec4899)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>AI</span>
-                </div>
-              </div>
-            </button>
-          </div>
-
-          {/* Right Controls: Visit Kapruka, Notifications, Cart, Sign In */}
-          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-            {/* Status light */}
-            <div className="hide-mobile" style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 11px", background:"#f1f5f9", borderRadius:99, border:"1px solid #e2e8f0", marginRight:4 }}>
-              <div style={{ width:7, height:7, borderRadius:"50%", background: loading?"#f59e0b":"#22c55e", boxShadow: loading?"0 0 6px #f59e0b":"0 0 6px #22c55e" }} />
-              <span style={{ fontSize:9, fontWeight:700, color:"#475569" }}>{loading?"SEARCHING…":"ONLINE"}</span>
-            </div>
-            {loading && <div className="hide-desktop" style={{ width:8, height:8, borderRadius:"50%", background:"#f59e0b", boxShadow:"0 0 8px #f59e0b", marginRight:4 }} />}
-
-            {/* Visit Kapruka Link */}
-            <a href="https://www.kapruka.com" target="_blank" rel="noopener noreferrer" title="Visit Kapruka.com" style={{
-              display:"flex", alignItems:"center", justifyContent:"center",
-              background:"linear-gradient(135deg,#f97316,#ef4444)",
-              color:"#fff", textDecoration:"none",
-              width:34, height:34, borderRadius:10, fontSize:15,
-              boxShadow:"0 3px 8px rgba(249,115,22,.25)", flexShrink:0,
-              transition:"opacity .18s",
-            }}
-            onMouseEnter={e => (e.currentTarget.style.opacity="0.85")}
-            onMouseLeave={e => (e.currentTarget.style.opacity="1")}
-            >
-              🌐
-            </a>
-
-            {/* Notifications */}
-            <button onClick={() => setShowNotif(v=>!v)} title="Notifications" style={{ background:"#f8fafc", border:"1px solid #e2e8f0", cursor:"pointer", width:34, height:34, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>
-              🔔
-            </button>
-
-            {/* Cart */}
-            <button onClick={() => setShowCart(true)} className={cartBounce ? "cart-bounce" : ""} title="Cart" style={{ position:"relative", background:"#f8fafc", border:"1px solid #e2e8f0", cursor:"pointer", width:34, height:34, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>
-              🛒
-              {cart.length > 0 && (
-                <span style={{ position:"absolute", top:-5, right:-5, background:"#6366f1", color:"#fff", fontSize:8, fontWeight:800, padding:"1px 4px", borderRadius:99, minWidth:14, textAlign:"center", lineHeight:"12px", border:"1.5px solid #f8fafc" }}>
-                  {cart.length}
-                </span>
+          <div style={{
+            display:"flex", alignItems:"center", justifyContent:"space-between",
+            maxWidth:860, margin:"0 auto", padding:"10px 12px", width:"100%"
+          }}>
+            {/* Left Controls: Logo & Back Button */}
+            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+              {/* Back button (Only on mobile when in chat view) */}
+              {!isEmpty && (
+                <button onClick={() => setMsgs([])} title="Back to Home" style={{
+                  background:"#f1f5f9", border:"1px solid #e2e8f0", cursor:"pointer",
+                  width:34, height:34, borderRadius:10, display:"flex", alignItems:"center",
+                  justifyContent:"center", fontSize:16, marginRight:2
+                }}>⬅️</button>
               )}
-            </button>
 
-            {/* Sign in */}
-            <button onClick={() => setShowLogin(true)} title="Sign In" style={{
-              background:"#0f172a", color:"#fff", border:"none", cursor:"pointer",
-              padding:"7px 12px", borderRadius:10, fontSize:11, fontWeight:700, transition:"background .18s",
-              display:"flex", alignItems:"center", gap:4
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background="#6366f1")}
-            onMouseLeave={e => (e.currentTarget.style.background="#0f172a")}
-            >
-              <span style={{ fontSize:13 }}>👤</span>
-              <span className="hide-mobile">Sign In</span>
-            </button>
+              {/* Logo */}
+              <button onClick={() => setMsgs([])} style={{ display:"flex", alignItems:"center", gap:8, border:"none", background:"none", cursor:"pointer", padding:0 }}>
+                <div style={{ width:34, height:34, borderRadius:10, background:"linear-gradient(135deg,#6366f1,#8b5cf6)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, boxShadow:"0 4px 12px rgba(99,102,241,.35)", flexShrink:0 }}>🛍️</div>
+                <div style={{ textAlign:"left" }} className="hide-mobile">
+                  <div style={{ fontSize:15, fontWeight:800, color:"#0f172a", lineHeight:1.1 }}>
+                    Kapruka <span style={{ background:"linear-gradient(135deg,#6366f1,#a78bfa,#ec4899)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>AI</span>
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            {/* Right Controls: Visit Kapruka, Notifications, Cart, Sign In */}
+            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+              {/* Status light */}
+              <div className="hide-mobile" style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 11px", background:"#f1f5f9", borderRadius:99, border:"1px solid #e2e8f0", marginRight:4 }}>
+                <div style={{ width:7, height:7, borderRadius:"50%", background: loading?"#f59e0b":"#22c55e", boxShadow: loading?"0 0 6px #f59e0b":"0 0 6px #22c55e" }} />
+                <span style={{ fontSize:9, fontWeight:700, color:"#475569" }}>{loading?"SEARCHING…":"ONLINE"}</span>
+              </div>
+              {loading && <div className="hide-desktop" style={{ width:8, height:8, borderRadius:"50%", background:"#f59e0b", boxShadow:"0 0 8px #f59e0b", marginRight:4 }} />}
+
+              {/* Visit Kapruka Link */}
+              <a href="https://www.kapruka.com" target="_blank" rel="noopener noreferrer" title="Visit Kapruka.com" style={{
+                display:"flex", alignItems:"center", justifyContent:"center",
+                background:"linear-gradient(135deg,#f97316,#ef4444)",
+                color:"#fff", textDecoration:"none",
+                width:34, height:34, borderRadius:10, fontSize:15,
+                boxShadow:"0 3px 8px rgba(249,115,22,.25)", flexShrink:0,
+                transition:"opacity .18s",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.opacity="0.85")}
+              onMouseLeave={e => (e.currentTarget.style.opacity="1")}
+              >
+                🌐
+              </a>
+
+              {/* Notifications */}
+              <button onClick={() => setShowNotif(v=>!v)} title="Notifications" style={{ background:"#f8fafc", border:"1px solid #e2e8f0", cursor:"pointer", width:34, height:34, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>
+                🔔
+              </button>
+
+              {/* Cart */}
+              <button onClick={() => setShowCart(true)} className={cartBounce ? "cart-bounce" : ""} title="Cart" style={{ position:"relative", background:"#f8fafc", border:"1px solid #e2e8f0", cursor:"pointer", width:34, height:34, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>
+                🛒
+                {cart.length > 0 && (
+                  <span style={{ position:"absolute", top:-5, right:-5, background:"#6366f1", color:"#fff", fontSize:8, fontWeight:800, padding:"1px 4px", borderRadius:99, minWidth:14, textAlign:"center", lineHeight:"12px", border:"1.5px solid #f8fafc" }}>
+                    {cart.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Sign in */}
+              <button onClick={() => setShowLogin(true)} title="Sign In" style={{
+                background:"#0f172a", color:"#fff", border:"none", cursor:"pointer",
+                padding:"7px 12px", borderRadius:10, fontSize:11, fontWeight:700, transition:"background .18s",
+                display:"flex", alignItems:"center", gap:4
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background="#6366f1")}
+              onMouseLeave={e => (e.currentTarget.style.background="#0f172a")}
+              >
+                <span style={{ fontSize:13 }}>👤</span>
+                <span className="hide-mobile">Sign In</span>
+              </button>
+            </div>
           </div>
         </header>
 
