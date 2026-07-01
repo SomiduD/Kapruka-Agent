@@ -865,78 +865,170 @@ export default function KaprukaChatApp() {
       <style dangerouslySetInnerHTML={{ __html: GLOBAL_CSS }} />
       {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
 
-      <div className="flex flex-col h-full bg-gradient-to-br from-slate-50 to-blue-50 overflow-hidden">
+      <div className="flex flex-col h-full bg-gradient-to-br from-slate-50 to-blue-50 overflow-hidden" style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden", background:"linear-gradient(135deg, #f8fafc 0%, #e0f2fe 100%)" }}>
 
         {/* ── Permanent Sticky Navbar — always visible on mobile & desktop ── */}
-        <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
-          {/* LEFT: Home Button */}
-          <div className="flex items-center gap-3">
-            {!isEmpty && (
-              <button
-                onClick={() => setMsgs([])}
-                title="Back to Home"
-                className="flex items-center justify-center w-9 h-9 rounded-xl border border-gray-200 bg-gray-50 hover:bg-indigo-50 text-base cursor-pointer transition-all duration-200"
-              >
-                ⬅️
-              </button>
-            )}
-            <button onClick={() => setMsgs([])} className="flex items-center gap-2 border-0 bg-transparent cursor-pointer p-0">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-xl shadow-md text-white">
-                🛍️
-              </div>
-              <span className="font-extrabold text-slate-800 text-base tracking-tight hidden sm:flex">
-                Kapruka <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent ml-1">AI</span>
-              </span>
-            </button>
-          </div>
-
-          {/* CENTER/QUICK LINK: Kapruka Brand colors or a nice blue */}
-          <div>
-            <a
-              href="https://www.kapruka.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-sm transition-all duration-300 no-underline"
-            >
-              <span>🌐</span>
-              <span className="hidden sm:flex">Visit Kapruka.com</span>
-            </a>
-          </div>
-
-          {/* RIGHT: Notifications, Cart, Sign In/Up */}
-          <div className="flex items-center gap-2.5">
-            {/* Notification Icon */}
-            <button
-              onClick={() => setShowNotif(v => !v)}
-              title="Notifications"
-              className="flex items-center justify-center w-9 h-9 rounded-xl border border-gray-200 bg-gray-50 hover:bg-indigo-50 text-base cursor-pointer transition-all duration-200"
-            >
-              🔔
-            </button>
-
-            {/* Cart Icon */}
-            <button
-              onClick={() => setShowCart(true)}
-              className={`flex items-center justify-center w-9 h-9 rounded-xl border border-gray-200 bg-gray-50 hover:bg-indigo-50 text-base cursor-pointer transition-all duration-200 relative ${cartBounce ? "animate-bounce" : ""}`}
-              title="Cart"
-            >
-              🛒
-              {cart.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-indigo-600 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-full border-2 border-white min-w-[16px] text-center leading-none">
-                  {cart.length}
-                </span>
+        <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm" style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 50,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          background: "rgba(255, 255, 255, 0.92)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          borderBottom: "1px solid #e2e8f0",
+          padding: "10px 14px",
+          boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.08)",
+          width: "100%",
+          flexShrink: 0
+        }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", maxWidth:860, margin:"0 auto", width:"100%", gap:8 }}>
+            {/* LEFT: Home Button */}
+            <div style={{ display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
+              {!isEmpty && (
+                <button
+                  onClick={() => setMsgs([])}
+                  title="Back to Home"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "10px",
+                    border: "1px solid #e2e8f0",
+                    background: "#f8fafc",
+                    cursor: "pointer",
+                    fontSize: "16px",
+                    marginRight: "2px"
+                  }}
+                >
+                  ⬅️
+                </button>
               )}
-            </button>
+              <button onClick={() => setMsgs([])} style={{ display:"flex", alignItems:"center", gap:8, border:"none", background:"none", cursor:"pointer", padding:0 }}>
+                <div style={{ width:"34px", height:"34px", borderRadius:"10px", background:"linear-gradient(135deg,#6366f1,#8b5cf6)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"18px", boxShadow:"0 4px 12px rgba(99,102,241,.35)", flexShrink:0, color:"#fff" }}>
+                  🛍️
+                </div>
+                <span className="font-extrabold text-slate-800 text-base tracking-tight hidden sm:flex">
+                  Kapruka <span style={{ background:"linear-gradient(135deg,#6366f1,#a78bfa,#ec4899)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", marginLeft:"2px" }}>AI</span>
+                </span>
+              </button>
+            </div>
 
-            {/* Sign Up / Sign In Button */}
-            <button
-              onClick={() => setShowLogin(true)}
-              title="Sign In / Sign Up"
-              className="flex items-center gap-1.5 bg-slate-900 hover:bg-indigo-600 text-white border-0 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all duration-200 cursor-pointer shadow-sm"
-            >
-              <span className="text-sm">👤</span>
-              <span className="hidden sm:flex">Sign Up / Sign In</span>
-            </button>
+            {/* CENTER/QUICK LINK: Kapruka Brand colors or a nice blue */}
+            <div style={{ display:"flex", alignItems:"center" }}>
+              <a
+                href="https://www.kapruka.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "8px 14px",
+                  borderRadius: "10px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "#fff",
+                  background: "linear-gradient(135deg, #2563eb, #4f46e5)",
+                  textDecoration: "none",
+                  boxShadow: "0 4px 14px rgba(79, 70, 229, 0.25)"
+                }}
+              >
+                <span>🌐</span>
+                <span className="hidden sm:flex">Visit Kapruka.com</span>
+              </a>
+            </div>
+
+            {/* RIGHT: Notifications, Cart, Sign In/Up */}
+            <div style={{ display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
+              {/* Notification Icon */}
+              <button
+                onClick={() => setShowNotif(v => !v)}
+                title="Notifications"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                  cursor: "pointer",
+                  fontSize: "16px"
+                }}
+              >
+                🔔
+              </button>
+
+              {/* Cart Icon */}
+              <button
+                onClick={() => setShowCart(true)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                  cursor: "pointer",
+                  fontSize: "16px",
+                  position: "relative"
+                }}
+                className={cartBounce ? "animate-bounce" : ""}
+                title="Cart"
+              >
+                🛒
+                {cart.length > 0 && (
+                  <span style={{
+                    position: "absolute",
+                    top: "-5px",
+                    right: "-5px",
+                    background: "#6366f1",
+                    color: "#fff",
+                    fontSize: "9px",
+                    fontWeight: 800,
+                    padding: "2px 5px",
+                    borderRadius: "99px",
+                    minWidth: "16px",
+                    textAlign: "center",
+                    lineHeight: "10px",
+                    border: "2px solid #fff"
+                  }}>
+                    {cart.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Sign Up / Sign In Button */}
+              <button
+                onClick={() => setShowLogin(true)}
+                title="Sign In / Sign Up"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  background: "#0f172a",
+                  color: "#fff",
+                  border: "none",
+                  padding: "8px 14px",
+                  borderRadius: "10px",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  boxShadow: "0 4px 6px rgba(0,0,0,0.1)"
+                }}
+              >
+                <span style={{ fontSize:"13px" }}>👤</span>
+                <span className="hidden sm:flex">Sign Up / Sign In</span>
+              </button>
+            </div>
           </div>
         </nav>
 
