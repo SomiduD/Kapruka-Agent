@@ -899,7 +899,12 @@ export default function KaprukaChatApp() {
   const recRef = useRef<any>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = document.getElementById("last-msg");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [msgs, loading]);
 
   /* ── API call ── */
@@ -1358,10 +1363,13 @@ export default function KaprukaChatApp() {
           ) : (
             /* Messages */
             <>
-              {msgs.map(m => {
+              {msgs.map((m, idx) => {
                 if (m.type === "loading") return <TypingIndicator key={m.id} />;
+                const isLast = idx === msgs.length - 1;
                 return (
-                  <MessageBubble key={m.id} msg={m} onSortChange={handleReSort} onAddToCart={handleAddToCart} />
+                  <div key={m.id} id={isLast ? "last-msg" : undefined} style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                    <MessageBubble msg={m} onSortChange={handleReSort} onAddToCart={handleAddToCart} />
+                  </div>
                 );
               })}
             </>

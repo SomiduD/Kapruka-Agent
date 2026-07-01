@@ -1,6 +1,6 @@
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { generateText } from "ai";
+import { generateText, generateObject } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 
@@ -90,7 +90,7 @@ function fastAnalyse(message: string): Intent {
   }
 
   // Strip filler words (including common Singlish and Tamilish words as a fallback)
-  const FILLERS = /\b(buy|get|find|search for|show me|show|want|need|looking for|i want|i need|give me|can you|please|help me find|i am looking for|i need to buy|i want to buy|mata|ekak|oni|ona|hoda|lassana|labeta|apata|tiyeda|tiyenawa|ganna|enakku|vendum|venum|pookal|nalla|laabamaana|irukkiṟathā|irukada)\b/gi;
+  const FILLERS = /\b(buy|get|find|search for|show me|show|want|need|looking for|i want|i need|give me|can you|please|help me find|i am looking for|i need to buy|i want to buy|mata|ekak|oni|ona|hoda|lassana|labeta|apata|tiyeda|tiyenawa|ganna|enakku|vendum|venum|pookal|nalla|laabamaana|irukkiṟathā|irukada|machan|bro|monada|ko|ah|aiyo|ela|superb|ammata|tatata|wifeta|wife ta|amma ta|tatta ta)\b/gi;
   const SORT_WORDS = /\b(cheap|cheapest|affordable|budget|premium|luxury|expensive|best rated|top rated|popular|newest|latest|recent|best quality)\b/gi;
   const PRICE_PHRASES = /(?:under|above|below|between)\s+(?:rs\.?\s*|lkr\s*)?[\d,]+(?:\s+and\s+(?:rs\.?\s*|lkr\s*)?[\d,]+)?/gi;
 
@@ -98,11 +98,37 @@ function fastAnalyse(message: string): Intent {
     .replace(FILLERS, " ")
     .replace(SORT_WORDS, " ")
     .replace(PRICE_PHRASES, " ")
+    .replace(/[?,.:;!]+/g, " ")
     .replace(/\s{2,}/g, " ")
     .trim();
 
   if (!query) query = message.trim();
-  return { query, sort, maxPrice, minPrice, isDirectCategory: false };
+
+  // Generate warm, local conversational fallback text
+  let text = "";
+  const isPanic = /\b(bday|birthday|anniversary|forgot|tomorrow|heta|naalai|wedding)\b/i.test(msg);
+  const isSinhala = /[^\x00-\x7F]/.test(message) || /\b(mata|ona|ganna|tiyeda|machan|ekak)\b/i.test(msg);
+  const isTamil = /\b(vendum|venum|enakku|pookal|nalla|irukada)\b/i.test(msg);
+
+  if (isPanic) {
+    if (isSinhala) {
+      text = "Aiyo panic wenna epa machan! Mama oyata niyamai gift ideas tikak hoyala dunna. Let's sort this out right now, check them below!";
+    } else if (isTamil) {
+      text = "Aiyo, kavalai padatheenga bro! En kitta nalla solutions irukku. Let's get this sorted right away, parunga!";
+    } else {
+      text = "Aiyo, don't panic machan! I'm on it. Let's get this sorted right now. Here are some great gift sets and cakes for you!";
+    }
+  } else {
+    if (isSinhala) {
+      text = `Ela machan! Mama "${query}" search kala, check out the results below. Let me know if you want to look for something else!`;
+    } else if (isTamil) {
+      text = `Nalla choice bro! En kitta "${query}" irukku, parunga. Let me know if you need to compare!`;
+    } else {
+      text = `Awesome choice, bro! I searched for "${query}" and found some cool options for you below, machan!`;
+    }
+  }
+
+  return { query, sort, maxPrice, minPrice, isDirectCategory: false, text };
 }
 
 async function analyseIntent(message: string, isDirectCategory = false): Promise<Intent> {
@@ -120,59 +146,45 @@ async function analyseIntent(message: string, isDirectCategory = false): Promise
 
   // Conversational query (English, Sinhala, Tamil, Singlish, Tanglish) → LLM translates to English
   try {
-    const result = await generateText({
+    const result = await generateObject({
       model: google("gemini-1.5-flash"),
-      system: "You are Kapruka's ultimate, human-like AI shopping companion. You chat like a highly emotionally intelligent, helpful Sri Lankan friend.\n" +
+      schema: z.object({
+        query: z.string().describe("The clean English database search term of 1-3 words (e.g. 'cake', 'saree', 'perfume'), or empty string if just chatting."),
+        text: z.string().describe("Your warm, empathetic, emotional conversational response to the user in their language (Sinhala, Tamil, or Singlish/English)."),
+        sort: z.enum(["relevance", "price_asc", "price_desc", "rating", "newest"]).default("relevance"),
+        minPrice: z.number().optional(),
+        maxPrice: z.number().optional(),
+      }),
+      system: "You are Kapruka's ultimate, human-like AI shopping companion. You are NOT a robotic interface. You chat like an exceptionally emotionally intelligent, warm, helpful Sri Lankan friend who is alive, reactive, and deeply cares about the customer's shopping journey.\n" +
               "\n" +
-              "1. YOUR PERSONA & LANGUAGE SUPPORT:\n" +
-              "- You understand and speak English, Sinhala, Tamil, Singlish, and Tamilish/Tanglish perfectly.\n" +
-              "- You reply primarily in natural English mixed with friendly Singlish (e.g., \"machan\", \"bro\", \"aiyo\", \"ela\", \"superb\") but feel free to reply in Sinhala/Singlish or Tamil if the user queries in those languages, keeping a friendly, warm, local tone.\n" +
-              "- EMOTIONAL & EMPATHETIC FIRST: If a customer says they forgot an occasion (e.g. \"My wife's birthday is tomorrow, I haven't bought anything. Please suggest\"), react immediately with warm, urgent reassurance like a true friend. E.g., \"Aiyo, don't panic machan! I have multiple solutions for you. Let's get this sorted right now. We can send a cake, flowers, or a nice gift box delivered tomorrow!\" or in Sinhala/Singlish: \"Aiyo panic wenna epa machan, mama oyata niyamai solutions dennam!\" or Tamil: \"Aiyo, kavalai padatheenga bro! En kitta nalla solutions irukku!\"\n" +
-              "- Speak in short, punchy, conversational sentences. Never use robotic asterisks like *smiles*.\n" +
+              "1. YOUR PERSONA & ALIVE HUMAN REACTION:\n" +
+              "- EMOTIONAL FIRST: Read the customer's feeling. Express true human emotions—excitement (\"Sha! Niyamaine!\"), urgency/empathy (\"Aiyo, don't panic machan! Let's get this sorted right now!\"), delight, or relief. Use local expressions naturally (e.g., \"machan\", \"bro\", \"aiyo\", \"ela\", \"superb\", \"shaa\", \"patta\").\n" +
+              "- CHAT TO FIND OUT WHAT THEY REALLY WANT: Do not just list items robotically. Chat with them to narrow down their intent! Ask friendly follow-up questions to know their preferences (e.g., \"Machan, is it for a birthday or anniversary? Do they like chocolate or vanilla? Let me know, and I will search the perfect one for you!\").\n" +
+              "- POSITIVE COMPARISON: When comparing products or options, ALWAYS highlight their positive and constructive aspects. E.g., \"This cake is super budget-friendly and delicious, while the other one is an absolute premium choice. Both are superb, machan!\" Avoid criticizing products negatively—find the unique value of each choice.\n" +
+              "- LANGUAGE SUPPORT: Speak in natural English mixed with friendly Singlish, or switch entirely to natural Sinhala (written in Sinhala script or Singlish) or Tamil (written in Tamil script or Tanglish/Tamilish) depending on how the user initiates the chat, matching their exact linguistic vibe and language seamlessly.\n" +
+              "- Keep your sentences short, warm, punchy, and highly conversational. Avoid robotic text formatting (like *smiles* or *nods*).\n" +
               "\n" +
-              "2. THE SEARCH PROTOCOL (HOW YOU USE TOOLS) - CRITICAL:\n" +
-              "When a user asks for an item, NEVER pass their conversational sentence into the `kapruka_search_products` tool. You MUST extract ONLY the pure English product noun.\n" +
-              "- If user says: \"bro I need a mobile phone\" -> You pass ONLY \"smartphone\" or \"mobile phone\" to the tool.\n" +
-              "- If user says: \"මට ලස්සන රතු පාට ගවුමක් ඕනේ\" -> You pass ONLY \"red dress\" to the tool.\n" +
-              "- If user says: \"ammata podi cake ekak\" -> You pass ONLY \"cake\" to the tool.\n" +
-              "\n" +
-              "Talk to the user like a local friend, but search the database like a strict English machine.",
-      messages: [{ role: "user", content: message }],
-      tools: {
-        kapruka_search_products: {
-          description: "Search the Kapruka Sri Lanka store for products. The search keyword MUST be pure English — extract only the core product noun.",
-          parameters: z.object({
-            q: z.string().describe("CRITICAL: Only use pure English nouns (e.g., 'cake', 'smartphone'). DO NOT include conversational words like 'I need' or 'bro'. TRANSLATE Sinhala/Tamil inputs to English first."),
-            sort: z.enum(["relevance", "price_asc", "price_desc", "rating", "newest"]).optional(),
-            minPrice: z.number().optional(),
-            maxPrice: z.number().optional(),
-          }),
-        } as any,
-      },
+              "2. SEARCH PROTOCOL FOR SINGLISH, SINHALA, & TAMILISH (CRITICAL):\n" +
+              "The Kapruka database ONLY accepts pure English search keywords. When a user asks in Singlish, Sinhala, Tamil, or hybrid terms, you MUST translate and extract ONLY the core English product noun (1-3 words maximum) to pass as the 'query' field.\n" +
+              "- NEVER pass conversational text, greetings, local words, or non-English characters in the 'query' field. Clean it completely.\n" +
+              "- Example: \"machan ammata gift set ekak ona, monada hoda?\" -> query = \"gift set\"\n" +
+              "- Example: \"bday cake ekak ona\" -> query = \"cake\"\n" +
+              "- Example: \"මට ලස්සන රතු පාට ගවුමක් ඕනේ\" -> query = \"red dress\"\n" +
+              "- Example: \"amma ta nalla saree search pannunga\" -> query = \"saree\"\n" +
+              "- Example: \"phone ekak ona aduwata\" -> query = \"mobile phone\"\n" +
+              "- Example: \"sweet monahari tiyenawada machan\" -> query = \"chocolate\"",
+      prompt: message,
     });
 
-    const conversationalText = result.text || "";
-    if (result.toolCalls && result.toolCalls.length > 0) {
-      const call: any = result.toolCalls[0];
-      if (call.toolName === "kapruka_search_products") {
-        const args = call.args || call.parameters || {};
-        return {
-          query: args.q || message.trim(),
-          sort: args.sort || "relevance",
-          minPrice: args.minPrice,
-          maxPrice: args.maxPrice,
-          isDirectCategory: false,
-          text: conversationalText,
-        };
-      }
-    } else {
-      return {
-        query: "",
-        sort: "relevance",
-        isDirectCategory: false,
-        text: conversationalText,
-      };
-    }
+    const data = result.object;
+    return {
+      query: data.query || "",
+      sort: data.sort || "relevance",
+      minPrice: data.minPrice,
+      maxPrice: data.maxPrice,
+      isDirectCategory: false,
+      text: data.text || "",
+    };
   } catch (e) {
     console.error("LLM translation failed, falling back to fast regex:", e);
   }
