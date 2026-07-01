@@ -44,6 +44,14 @@ interface User {
   joinedAt?: string;
 }
 
+interface Order {
+  id: string;
+  date: string;
+  status: "Delivered" | "Processing" | "In Transit";
+  items: string;
+  total: string;
+}
+
 /* ─────────────────────────────────────────
    CSS-in-JS global styles
 ───────────────────────────────────────── */
@@ -581,12 +589,7 @@ function LoginModal({ onClose, onLoginSuccess }: { onClose: () => void; onLoginS
 /* ─────────────────────────────────────────
    Profile Modal
    ───────────────────────────────────────── */
-function ProfileModal({ user, onClose, onLogout }: { user: User; onClose: () => void; onLogout: () => void }) {
-  const orders = [
-    { id: "KP-78923", date: "Jul 1, 2026", status: "Delivered", items: "Karma Book + Cards Combo", total: "LKR 2,650" },
-    { id: "KP-78810", date: "Jun 28, 2026", status: "In Transit", items: "Ferrero Rocher Chocolate Mousse Cake", total: "LKR 10,500" }
-  ];
-
+function ProfileModal({ user, orders, onClose, onLogout }: { user: User; orders: Order[]; onClose: () => void; onLogout: () => void }) {
   return (
     <div style={{ position:"fixed", inset:0, zIndex:200, background:"rgba(15,23,42,.55)", backdropFilter:"blur(6px)", display:"flex", alignItems:"center", justifyContent:"center", padding:16 }} onClick={onClose}>
       <div className="scale-in" style={{ background:"#fff", borderRadius:24, width:"100%", maxWidth:450, overflow:"hidden", boxShadow:"0 25px 70px rgba(0,0,0,.18)" }} onClick={e => e.stopPropagation()}>
@@ -618,25 +621,33 @@ function ProfileModal({ user, onClose, onLogout }: { user: User; onClose: () => 
 
           <div>
             <h4 style={{ fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Recent Activity / Orders</h4>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {orders.map((o) => (
-                <div key={o.id} style={{ display:"flex", flexDirection:"column", gap: 4, border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, fontSize: 12 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700 }}>
-                    <span style={{ color: "#4f46e5" }}>{o.id}</span>
-                    <span style={{ color: "#64748b" }}>{o.date}</span>
+            {orders.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "30px 10px", border: "1px dashed #cbd5e1", borderRadius: 16, background: "#f8fafc" }}>
+                <span style={{ fontSize: 32, display: "block", marginBottom: 8 }}>📦</span>
+                <p style={{ fontSize: 13, fontWeight: 700, color: "#475569" }}>No orders placed yet</p>
+                <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, lineHeight: 1.4 }}>Add items to your cart and place an order to see your real-time purchase history here.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {orders.map((o) => (
+                  <div key={o.id} style={{ display:"flex", flexDirection:"column", gap: 4, border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, fontSize: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700 }}>
+                      <span style={{ color: "#4f46e5" }}>{o.id}</span>
+                      <span style={{ color: "#64748b" }}>{o.date}</span>
+                    </div>
+                    <div style={{ color: "#0f172a", marginTop: 2 }}>{o.items}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, alignItems: "center" }}>
+                      <span style={{ fontWeight: 800 }}>{o.total}</span>
+                      <span style={{
+                        padding: "2px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700,
+                        background: o.status === "Delivered" ? "#d1fae5" : (o.status === "Processing" ? "#dbeafe" : "#fef3c7"),
+                        color: o.status === "Delivered" ? "#065f46" : (o.status === "Processing" ? "#1e40af" : "#92400e")
+                      }}>{o.status}</span>
+                    </div>
                   </div>
-                  <div style={{ color: "#0f172a", marginTop: 2 }}>{o.items}</div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, alignItems: "center" }}>
-                    <span style={{ fontWeight: 800 }}>{o.total}</span>
-                    <span style={{
-                      padding: "2px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700,
-                      background: o.status === "Delivered" ? "#d1fae5" : "#fef3c7",
-                      color: o.status === "Delivered" ? "#065f46" : "#92400e"
-                    }}>{o.status}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <button onClick={() => { onLogout(); onClose(); }} style={{
@@ -751,7 +762,7 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
 /* ─────────────────────────────────────────
    Cart Panel
 ───────────────────────────────────────── */
-function CartPanel({ onClose, cart, onRemove }: { onClose: () => void; cart: Product[]; onRemove: (idx: number) => void }) {
+function CartPanel({ onClose, cart, onRemove, onCheckout }: { onClose: () => void; cart: Product[]; onRemove: (idx: number) => void; onCheckout: () => void }) {
   const total = cart.reduce((sum, item) => sum + (item._numPrice || 0), 0);
 
   return (
@@ -802,13 +813,13 @@ function CartPanel({ onClose, cart, onRemove }: { onClose: () => void; cart: Pro
               <span style={{ fontSize:14, fontWeight:600, color:"#64748b" }}>Subtotal</span>
               <span style={{ fontSize:18, fontWeight:800, color:"#0f172a" }}>LKR {total.toLocaleString()}</span>
             </div>
-            <a href="https://www.kapruka.com/cart" target="_blank" rel="noopener noreferrer" style={{
-              display:"block", width:"100%", padding:"14px 0", borderRadius:14, fontSize:15, fontWeight:700,
-              background:"linear-gradient(135deg,#6366f1,#7c3aed)", color:"#fff", textAlign:"center",
-              boxShadow:"0 4px 16px rgba(99,102,241,.3)", textDecoration:"none",
+            <button onClick={onCheckout} style={{
+              width:"100%", padding:"14px 0", borderRadius:14, fontSize:15, fontWeight:700,
+              background:"linear-gradient(135deg,#6366f1,#7c3aed)", color:"#fff", border:"none", cursor:"pointer",
+              boxShadow:"0 4px 16px rgba(99,102,241,.3)"
             }}>
-              Checkout on Kapruka →
-            </a>
+              Place Order with Kapruka AI →
+            </button>
           </div>
         )}
       </div>
@@ -854,6 +865,7 @@ export default function KaprukaChatApp() {
   const [cartBounce, setCartBounce] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [showProfile, setShowProfile] = useState(false);
+  const [orders, setOrders] = useState<Order[]>([]);
 
   useEffect(() => {
     const saved = localStorage.getItem("kapruka_user");
@@ -862,6 +874,22 @@ export default function KaprukaChatApp() {
         setUser(JSON.parse(saved));
       } catch (e) {
         console.error("Failed to load user state:", e);
+      }
+    }
+    const savedCart = localStorage.getItem("kapruka_cart");
+    if (savedCart) {
+      try {
+        setCart(JSON.parse(savedCart));
+      } catch (e) {
+        console.error("Failed to load cart state:", e);
+      }
+    }
+    const savedOrders = localStorage.getItem("kapruka_orders");
+    if (savedOrders) {
+      try {
+        setOrders(JSON.parse(savedOrders));
+      } catch (e) {
+        console.error("Failed to load orders state:", e);
       }
     }
   }, []);
@@ -954,14 +982,53 @@ export default function KaprukaChatApp() {
   }, [doSearch]);
 
   const handleAddToCart = useCallback((p: Product) => {
-    setCart(c => [...c, p]);
+    setCart(c => {
+      const updated = [...c, p];
+      localStorage.setItem("kapruka_cart", JSON.stringify(updated));
+      return updated;
+    });
     setCartBounce(true);
     setTimeout(() => setCartBounce(false), 500);
   }, []);
 
   const handleRemoveFromCart = useCallback((idx: number) => {
-    setCart(c => c.filter((_, i) => i !== idx));
+    setCart(c => {
+      const updated = c.filter((_, i) => i !== idx);
+      localStorage.setItem("kapruka_cart", JSON.stringify(updated));
+      return updated;
+    });
   }, []);
+
+  const handleCheckout = useCallback(() => {
+    if (!user) {
+      alert("Aiyo machan, please sign in or create an account first to complete your checkout! We want to keep your orders safe.");
+      setShowCart(false);
+      setShowLogin(true);
+      return;
+    }
+    if (cart.length === 0) return;
+
+    const newOrder: Order = {
+      id: `KP-${Math.floor(10000 + Math.random() * 90000)}`,
+      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      status: "Processing",
+      items: cart.map(item => item.name).join(", "),
+      total: `LKR ${cart.reduce((sum, item) => sum + (item._numPrice || 0), 0).toLocaleString()}`
+    };
+
+    setOrders(prevOrders => {
+      const updated = [newOrder, ...prevOrders];
+      localStorage.setItem("kapruka_orders", JSON.stringify(updated));
+      return updated;
+    });
+
+    setCart([]);
+    localStorage.removeItem("kapruka_cart");
+
+    alert(`🎉 Success! Order ${newOrder.id} has been placed. We are preparing it for delivery!`);
+    setShowCart(false);
+    setShowProfile(true);
+  }, [user, cart]);
 
   /* ── Voice ── */
   const startVoice = () => {
@@ -1349,9 +1416,9 @@ export default function KaprukaChatApp() {
 
       {/* Modals */}
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} onLoginSuccess={setUser} />}
-      {showProfile && user && <ProfileModal user={user} onClose={() => setShowProfile(false)} onLogout={() => { setUser(null); localStorage.removeItem("kapruka_user"); }} />}
+      {showProfile && user && <ProfileModal user={user} orders={orders} onClose={() => setShowProfile(false)} onLogout={() => { setUser(null); setOrders([]); localStorage.removeItem("kapruka_user"); localStorage.removeItem("kapruka_orders"); }} />}
       {showNotif && <NotifPanel onClose={() => setShowNotif(false)} />}
-      {showCart && <CartPanel onClose={() => setShowCart(false)} cart={cart} onRemove={handleRemoveFromCart} />}
+      {showCart && <CartPanel onClose={() => setShowCart(false)} cart={cart} onRemove={handleRemoveFromCart} onCheckout={handleCheckout} />}
       {showImgSearch && (
         <ImageSearchModal
           onClose={() => setShowImgSearch(false)}
