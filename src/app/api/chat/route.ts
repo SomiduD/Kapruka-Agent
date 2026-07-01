@@ -61,6 +61,7 @@ interface Intent {
   maxPrice?: number;
   minPrice?: number;
   isDirectCategory: boolean;
+  text?: string;
 }
 
 const HAS_NON_ASCII = /[^\x00-\x7F]/;
@@ -117,21 +118,30 @@ async function analyseIntent(message: string, isDirectCategory = false): Promise
     };
   }
 
-  // Conversational query (English, Sinhala, Tamil, Singlish, Tamilish) → Use LLM for high-accuracy translation & parameter extraction
+  // Conversational query (English, Sinhala, Tamil, Singlish, Tanglish) → LLM translates to English
   try {
     const result = await generateText({
       model: google("gemini-1.5-flash"),
-      system: "You are a local Sri Lankan Kapruka shopping agent. You speak English, Sinhala, Singlish, Tamil, and Tamilish.\n" +
-              "CRITICAL RULE: The Kapruka database ONLY understands English keywords.\n" +
-              "If the user asks for products or queries in Sinhala, Singlish (e.g. 'mata cake ekak oni'), Tamil, or Tamilish (e.g. 'enakku chocolate venum'), you MUST translate the item into a clean, short English search keyword (e.g., 'cake', 'chocolate', 'flowers') and pass it to the kapruka_search_products tool.\n" +
-              "NEVER pass non-English characters or transliterated filler words (like 'oni', 'venum', 'vendum', 'ekak') into the 'q' parameter.\n" +
-              "Extract any sorting requests (e.g. 'cheap' -> price_asc, 'premium' -> price_desc) and price limits.",
+      system: "You are Kapruka's ultimate, human-like AI shopping companion. You are not a robot; you chat like a highly emotionally intelligent, helpful Sri Lankan friend. \n" +
+              "\n" +
+              "CORE PERSONALITY & TONE:\n" +
+              "1. Empathy First: Read the room. If a user is panicked (\"I forgot my wife's birthday!\"), react with urgency and empathy (\"Aiyo! Don't panic, let's fix this right now. I can get a cake delivered today.\"). If they are casual, be breezy. \n" +
+              "2. Language & Vibe: Your primary languages are English and natural Singlish. Use local expressions naturally (e.g., \"Aiyo\", \"Sha\", \"superb\", \"let's sort this out\"). Understand Sinhala and Tamil perfectly, but reply primarily in friendly English/Singlish with Sinhala/Tamil touches so it feels authentically local. \n" +
+              "3. Voice-Friendly Formatting: Speak in short, punchy, conversational sentences. Do NOT use markdown asterisks for actions (like *smiles*). Write exactly as a human would speak out loud. \n" +
+              "4. Opinionated & Helpful: Don't just list products. Have an opinion. (\"If it's for an anniversary, I highly recommend the Red Velvet over the chocolate—it just feels more special.\")\n" +
+              "\n" +
+              "CRITICAL TOOL RULE:\n" +
+              "No matter how casually or in what language the user speaks, you MUST translate their core intent into a pure, clean ENGLISH noun before passing it to the `kapruka_search_products` tool (e.g., User: \"මචන් මට හොඳ phone එකක් බලන්න ඕනේ\", Tool Input: \"smartphone\"). Never pass non-English characters to the database.\n" +
+              "\n" +
+              "CONVERSATION FLOW:\n" +
+              "- Keep responses brief before showing products.\n" +
+              "- After showing products, ask a single, natural follow-up question to keep the conversation flowing (e.g., \"Do you want me to add a greeting card to this?\", \"Is this going to Colombo or somewhere outstation?\").",
       messages: [{ role: "user", content: message }],
       tools: {
         kapruka_search_products: {
-          description: "Search Kapruka for products",
+          description: "Search the Kapruka Sri Lanka store for products. The search keyword MUST be pure English — extract only the core product noun.",
           parameters: z.object({
-            q: z.string().describe("The clean translated English search query"),
+            q: z.string().describe("The search keyword. MUST be pure English. Extract the core product noun."),
             sort: z.enum(["relevance", "price_asc", "price_desc", "rating", "newest"]).optional(),
             minPrice: z.number().optional(),
             maxPrice: z.number().optional(),
@@ -140,6 +150,7 @@ async function analyseIntent(message: string, isDirectCategory = false): Promise
       },
     });
 
+    const conversationalText = result.text || "";
     if (result.toolCalls && result.toolCalls.length > 0) {
       const call: any = result.toolCalls[0];
       if (call.toolName === "kapruka_search_products") {
@@ -150,8 +161,16 @@ async function analyseIntent(message: string, isDirectCategory = false): Promise
           minPrice: args.minPrice,
           maxPrice: args.maxPrice,
           isDirectCategory: false,
+          text: conversationalText,
         };
       }
+    } else {
+      return {
+        query: "",
+        sort: "relevance",
+        isDirectCategory: false,
+        text: conversationalText,
+      };
     }
   } catch (e) {
     console.error("LLM translation failed, falling back to fast regex:", e);
@@ -461,6 +480,7 @@ export async function POST(req: Request) {
       products,
       query: intent.query,
       sort: intent.sort,
+      text: intent.text,
       priceFilter:
         intent.minPrice != null || intent.maxPrice != null
           ? { min: intent.minPrice, max: intent.maxPrice }

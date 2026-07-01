@@ -93,10 +93,21 @@ const GLOBAL_CSS = `
 
   .product-card {
     background:#fff; border-radius:18px; border:1px solid #e8edf3;
-    overflow:hidden; display:flex; flex-direction:column;
+    overflow:hidden; display:flex; flex-direction:column; height:100%;
     transition:transform .22s, box-shadow .22s;
   }
   .product-card:hover { transform:translateY(-4px); box-shadow:0 16px 40px rgba(0,0,0,.1); }
+  .product-card-body { display:flex; flex-direction:column; flex:1; padding:12px 14px 14px; gap:6px; }
+  .product-card-bottom { margin-top:auto; display:flex; flex-direction:column; gap:6px; padding-top:8px; }
+
+  .view-btn {
+    display:block; text-align:center; padding:9px 0; border-radius:10px;
+    font-size:12px; font-weight:700;
+    background: linear-gradient(135deg, #2563eb, #4f46e5);
+    color:#fff; border:none; cursor:pointer; transition:all .2s; letter-spacing:0.01em;
+    box-shadow: 0 4px 14px rgba(79,70,229,.28);
+  }
+  .view-btn:hover { background: linear-gradient(135deg, #1d4ed8, #4338ca); box-shadow: 0 6px 20px rgba(79,70,229,.4); transform:translateY(-1px); }
 
   .send-btn {
     width:44px; height:44px; border-radius:14px; border:none; cursor:pointer;
@@ -125,6 +136,33 @@ const GLOBAL_CSS = `
   .icon-btn.active { background:#fef2f2; }
 
   .cart-bounce { animation: cartBounce 0.4s ease; }
+
+  /* Navbar icon buttons */
+  .nav-icon-btn {
+    display:flex; align-items:center; justify-content:center;
+    width:36px; height:36px; border-radius:10px; border:1px solid #e2e8f0;
+    background:#f8fafc; cursor:pointer; font-size:16px; position:relative;
+    transition:background .18s, border-color .18s; flex-shrink:0;
+  }
+  .nav-icon-btn:hover { background:#eef2ff; border-color:#a5b4fc; }
+
+  .nav-kapruka-btn {
+    display:inline-flex; align-items:center; gap:5px;
+    background:linear-gradient(135deg,#f97316,#ef4444);
+    color:#fff; border:none; cursor:pointer;
+    padding:7px 13px; border-radius:10px; font-size:12px; font-weight:700;
+    box-shadow:0 3px 10px rgba(249,115,22,.3); transition:opacity .18s; flex-shrink:0;
+    text-decoration:none;
+  }
+  .nav-kapruka-btn:hover { opacity:0.88; }
+
+  .nav-signin-btn {
+    display:inline-flex; align-items:center; gap:5px;
+    background:#0f172a; color:#fff; border:none; cursor:pointer;
+    padding:7px 13px; border-radius:10px; font-size:12px; font-weight:700;
+    transition:background .18s; flex-shrink:0; white-space:nowrap;
+  }
+  .nav-signin-btn:hover { background:#6366f1; }
 
   @media (max-width: 640px) {
     .hide-mobile { display: none !important; }
@@ -185,7 +223,6 @@ function ProductCard({ p, onAddToCart }: { p: Product; onAddToCart: (p: Product)
   const numPrice = p._numPrice ?? (typeof p.price === "number" ? p.price : parseFloat(String(p.price).replace(/[^0-9.]/g, "")) || 0);
   const displayPrice = numPrice > 0 ? numPrice.toLocaleString() : String(p.price);
 
-  // Build the safest possible product URL
   const productUrl = p.url || p.link ||
     (p.product_id ? `https://www.kapruka.com/buyonline/${p.product_id}` : null) ||
     (p.id ? `https://www.kapruka.com/buyonline/${p.id}` : null) ||
@@ -200,84 +237,94 @@ function ProductCard({ p, onAddToCart }: { p: Product; onAddToCart: (p: Product)
   };
 
   return (
-    <div className="product-card" style={{ position: "relative" }}>
-      {/* Image */}
-      <div style={{ position:"relative", height:170, background:"#f1f5f9", overflow:"hidden" }}>
+    <div className="product-card h-full flex flex-col bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 relative">
+      {/* Image — fixed height (h-48) and object-contain */}
+      <div className="relative h-48 bg-slate-50 flex items-center justify-center overflow-hidden flex-shrink-0">
         {img && !imgErr ? (
-          <img src={img} alt={p.name} style={{ width:"100%", height:"100%", objectFit:"cover", transition:"transform .3s" }}
+          <img
+            src={img}
+            alt={p.name}
+            className="w-full h-full object-contain p-3 transition-transform duration-300 hover:scale-105"
             onError={() => setImgErr(true)}
-            onMouseEnter={e => (e.currentTarget.style.transform="scale(1.05)")}
-            onMouseLeave={e => (e.currentTarget.style.transform="")}
           />
         ) : (
-          <div style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:44, color:"#cbd5e1" }}>🛍️</div>
+          <div className="text-4xl text-slate-300">🛍️</div>
         )}
         {p.discount && (
-          <span style={{ position:"absolute", top:10, left:10, background:"#ef4444", color:"#fff", fontSize:10, fontWeight:700, padding:"3px 8px", borderRadius:99, zIndex:10 }}>-{p.discount}%</span>
+          <span className="absolute top-2.5 left-2.5 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full z-10">
+            -{p.discount}%
+          </span>
         )}
         {p.inStock === false ? (
-          <div style={{ position:"absolute", inset:0, background:"rgba(255,255,255,.72)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:10 }}>
-            <span style={{ background:"#fff", border:"1px solid #e2e8f0", padding:"4px 12px", borderRadius:99, fontSize:11, fontWeight:700, color:"#64748b" }}>Out of Stock</span>
+          <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10">
+            <span className="bg-white border border-gray-200 px-3 py-1 rounded-full text-[11px] font-bold text-slate-500 shadow-sm">
+              Out of Stock
+            </span>
           </div>
         ) : (
           /* Floating Circular Cart Action */
-          <button onClick={handleAddToCart} title="Add to Cart" style={{
-            position: "absolute",
-            top: 10,
-            right: 10,
-            width: 36,
-            height: 36,
-            borderRadius: "50%",
-            background: added ? "#22c55e" : "#ffffff",
-            border: "none",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 16,
-            color: added ? "#ffffff" : "#4f46e5",
-            transition: "all 0.2s ease",
-            zIndex: 15
-          }}>
+          <button
+            onClick={handleAddToCart}
+            title="Add to Cart"
+            className={`absolute top-2.5 right-2.5 w-9 h-9 rounded-full border-0 shadow-md cursor-pointer flex items-center justify-center text-base transition-all duration-200 z-15 ${
+              added ? "bg-green-500 text-white" : "bg-white/95 text-indigo-600 hover:scale-105"
+            }`}
+          >
             {added ? "✓" : "🛒"}
           </button>
         )}
       </div>
 
       {/* Body */}
-      <div style={{ padding:"12px 14px 14px", display:"flex", flexDirection:"column", gap:6, flex:1 }}>
-        {p.category && <span style={{ fontSize:10, fontWeight:700, color:"#6366f1", textTransform:"uppercase", letterSpacing:"0.06em" }}>{p.category}</span>}
-        <p style={{ fontSize:13, fontWeight:600, color:"#1e293b", lineHeight:1.4, display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden", flex:1 }}>{p.name}</p>
+      <div className="p-4 flex flex-col flex-1 gap-2.5">
+        {p.category && (
+          <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
+            {p.category}
+          </span>
+        )}
+        <p className="text-xs font-semibold text-slate-700 leading-snug line-clamp-2 min-h-[2.8rem]">
+          {p.name}
+        </p>
 
         {/* Stars */}
         {p.rating != null && (
-          <div style={{ display:"flex", alignItems:"center", gap:4 }}>
-            <div style={{ display:"flex", gap:1 }}>
-              {[1,2,3,4,5].map(s => (
-                <svg key={s} width={11} height={11} fill={s<=Math.round(p.rating!) ? "#fbbf24" : "#e2e8f0"} viewBox="0 0 20 20">
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+          <div className="flex items-center gap-1">
+            <div className="flex gap-0.5">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <svg
+                  key={s}
+                  width={11}
+                  height={11}
+                  fill={s <= Math.round(p.rating!) ? "#fbbf24" : "#e2e8f0"}
+                  viewBox="0 0 20 20"
+                >
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                 </svg>
               ))}
             </div>
-            {p.reviewCount && <span style={{ fontSize:10, color:"#94a3b8" }}>({p.reviewCount})</span>}
+            {p.reviewCount && <span className="text-[10px] text-slate-400">({p.reviewCount})</span>}
           </div>
         )}
 
-        {/* Price */}
-        <div style={{ display:"flex", alignItems:"baseline", gap:6 }}>
-          <span style={{ fontSize:16, fontWeight:700, color:"#0f172a" }}>LKR {displayPrice}</span>
-          {p.originalPrice && <span style={{ fontSize:11, color:"#94a3b8", textDecoration:"line-through" }}>LKR {p.originalPrice}</span>}
-        </div>
+        {/* Price + CTA container pushed to the bottom using mt-auto */}
+        <div className="mt-auto flex flex-col gap-2.5 pt-2">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-base font-bold text-slate-900">LKR {displayPrice}</span>
+            {p.originalPrice && (
+              <span className="text-[11px] text-slate-400 line-through">LKR {p.originalPrice}</span>
+            )}
+          </div>
 
-        {/* Full-width View Button */}
-        <a href={productUrl} target="_blank" rel="noopener noreferrer"
-          style={{ display:"block", textAlign:"center", padding:"9px 0", borderRadius:10, fontSize:12, fontWeight:600, background:"#eef2ff", color:"#4f46e5", transition:"all .18s", marginTop:2 }}
-          onMouseEnter={e => { (e.currentTarget.style.background="#4f46e5"); (e.currentTarget.style.color="#fff"); }}
-          onMouseLeave={e => { (e.currentTarget.style.background="#eef2ff"); (e.currentTarget.style.color="#4f46e5"); }}
-        >
-          View on Kapruka →
-        </a>
+          {/* View on Kapruka Button - Gradient, colorful, rounded-xl */}
+          <a
+            href={productUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block text-center py-2.5 rounded-xl text-xs font-semibold text-white no-underline shadow-md bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all duration-300"
+          >
+            View on Kapruka →
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -732,9 +779,9 @@ export default function KaprukaChatApp() {
         const labels: Record<string, string> = { price_asc:"cheapest first", price_desc:"most expensive first", rating:"top rated first", newest:"newest first" };
         sortLabel = ` · sorted by ${labels[data.sort] || data.sort}`;
       }
-      const text = count > 0
+      const text = data.text || (count > 0
         ? `Found **${count}** results for "${data.query}"${sortLabel}:`
-        : `No results found for "${data.query}". Try different keywords.`;
+        : `No results found for "${data.query}". Try different keywords.`);
 
       setMsgs(prev => prev.map(m => m.id === aiId ? {
         ...m,
@@ -818,96 +865,82 @@ export default function KaprukaChatApp() {
       <style dangerouslySetInnerHTML={{ __html: GLOBAL_CSS }} />
       {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
 
-      <div style={{ display:"flex", flexDirection:"column", height:"100%", background:"#f8fafc", overflow:"hidden" }}>
+      <div className="flex flex-col h-full bg-gradient-to-br from-slate-50 to-blue-50 overflow-hidden">
 
-        {/* ── Header ── */}
-        <header style={{
-          flexShrink:0, background:"rgba(255,255,255,.94)",
-          backdropFilter:"blur(20px)", borderBottom:"1px solid #e8edf3",
-          boxShadow:"0 1px 10px rgba(0,0,0,.05)", zIndex:50,
-        }}>
-          <div style={{
-            display:"flex", alignItems:"center", justifyContent:"space-between",
-            maxWidth:860, margin:"0 auto", padding:"10px 12px", width:"100%"
-          }}>
-            {/* Left Controls: Logo & Back Button */}
-            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-              {/* Back button (Only on mobile when in chat view) */}
-              {!isEmpty && (
-                <button onClick={() => setMsgs([])} title="Back to Home" style={{
-                  background:"#f1f5f9", border:"1px solid #e2e8f0", cursor:"pointer",
-                  width:34, height:34, borderRadius:10, display:"flex", alignItems:"center",
-                  justifyContent:"center", fontSize:16, marginRight:2
-                }}>⬅️</button>
-              )}
-
-              {/* Logo */}
-              <button onClick={() => setMsgs([])} style={{ display:"flex", alignItems:"center", gap:8, border:"none", background:"none", cursor:"pointer", padding:0 }}>
-                <div style={{ width:34, height:34, borderRadius:10, background:"linear-gradient(135deg,#6366f1,#8b5cf6)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, boxShadow:"0 4px 12px rgba(99,102,241,.35)", flexShrink:0 }}>🛍️</div>
-                <div style={{ textAlign:"left" }} className="hide-mobile">
-                  <div style={{ fontSize:15, fontWeight:800, color:"#0f172a", lineHeight:1.1 }}>
-                    Kapruka <span style={{ background:"linear-gradient(135deg,#6366f1,#a78bfa,#ec4899)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>AI</span>
-                  </div>
-                </div>
+        {/* ── Permanent Sticky Navbar — always visible on mobile & desktop ── */}
+        <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
+          {/* LEFT: Home Button */}
+          <div className="flex items-center gap-3">
+            {!isEmpty && (
+              <button
+                onClick={() => setMsgs([])}
+                title="Back to Home"
+                className="flex items-center justify-center w-9 h-9 rounded-xl border border-gray-200 bg-gray-50 hover:bg-indigo-50 text-base cursor-pointer transition-all duration-200"
+              >
+                ⬅️
               </button>
-            </div>
-
-            {/* Right Controls: Visit Kapruka, Notifications, Cart, Sign In */}
-            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-              {/* Status light */}
-              <div className="hide-mobile" style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 11px", background:"#f1f5f9", borderRadius:99, border:"1px solid #e2e8f0", marginRight:4 }}>
-                <div style={{ width:7, height:7, borderRadius:"50%", background: loading?"#f59e0b":"#22c55e", boxShadow: loading?"0 0 6px #f59e0b":"0 0 6px #22c55e" }} />
-                <span style={{ fontSize:9, fontWeight:700, color:"#475569" }}>{loading?"SEARCHING…":"ONLINE"}</span>
+            )}
+            <button onClick={() => setMsgs([])} className="flex items-center gap-2 border-0 bg-transparent cursor-pointer p-0">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-xl shadow-md text-white">
+                🛍️
               </div>
-              {loading && <div className="hide-desktop" style={{ width:8, height:8, borderRadius:"50%", background:"#f59e0b", boxShadow:"0 0 8px #f59e0b", marginRight:4 }} />}
-
-              {/* Visit Kapruka Link */}
-              <a href="https://www.kapruka.com" target="_blank" rel="noopener noreferrer" title="Visit Kapruka.com" style={{
-                display:"flex", alignItems:"center", justifyContent:"center",
-                background:"linear-gradient(135deg,#f97316,#ef4444)",
-                color:"#fff", textDecoration:"none",
-                width:34, height:34, borderRadius:10, fontSize:15,
-                boxShadow:"0 3px 8px rgba(249,115,22,.25)", flexShrink:0,
-                transition:"opacity .18s",
-              }}
-              onMouseEnter={e => (e.currentTarget.style.opacity="0.85")}
-              onMouseLeave={e => (e.currentTarget.style.opacity="1")}
-              >
-                🌐
-              </a>
-
-              {/* Notifications */}
-              <button onClick={() => setShowNotif(v=>!v)} title="Notifications" style={{ background:"#f8fafc", border:"1px solid #e2e8f0", cursor:"pointer", width:34, height:34, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>
-                🔔
-              </button>
-
-              {/* Cart */}
-              <button onClick={() => setShowCart(true)} className={cartBounce ? "cart-bounce" : ""} title="Cart" style={{ position:"relative", background:"#f8fafc", border:"1px solid #e2e8f0", cursor:"pointer", width:34, height:34, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>
-                🛒
-                {cart.length > 0 && (
-                  <span style={{ position:"absolute", top:-5, right:-5, background:"#6366f1", color:"#fff", fontSize:8, fontWeight:800, padding:"1px 4px", borderRadius:99, minWidth:14, textAlign:"center", lineHeight:"12px", border:"1.5px solid #f8fafc" }}>
-                    {cart.length}
-                  </span>
-                )}
-              </button>
-
-              {/* Sign in */}
-              <button onClick={() => setShowLogin(true)} title="Sign In" style={{
-                background:"#0f172a", color:"#fff", border:"none", cursor:"pointer",
-                padding:"7px 12px", borderRadius:10, fontSize:11, fontWeight:700, transition:"background .18s",
-                display:"flex", alignItems:"center", gap:4
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background="#6366f1")}
-              onMouseLeave={e => (e.currentTarget.style.background="#0f172a")}
-              >
-                <span style={{ fontSize:13 }}>👤</span>
-                <span className="hide-mobile">Sign In</span>
-              </button>
-            </div>
+              <span className="font-extrabold text-slate-800 text-base tracking-tight hidden sm:flex">
+                Kapruka <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent ml-1">AI</span>
+              </span>
+            </button>
           </div>
-        </header>
 
-        {/* ── Chat Area ── */}
+          {/* CENTER/QUICK LINK: Kapruka Brand colors or a nice blue */}
+          <div>
+            <a
+              href="https://www.kapruka.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-sm transition-all duration-300 no-underline"
+            >
+              <span>🌐</span>
+              <span className="hidden sm:flex">Visit Kapruka.com</span>
+            </a>
+          </div>
+
+          {/* RIGHT: Notifications, Cart, Sign In/Up */}
+          <div className="flex items-center gap-2.5">
+            {/* Notification Icon */}
+            <button
+              onClick={() => setShowNotif(v => !v)}
+              title="Notifications"
+              className="flex items-center justify-center w-9 h-9 rounded-xl border border-gray-200 bg-gray-50 hover:bg-indigo-50 text-base cursor-pointer transition-all duration-200"
+            >
+              🔔
+            </button>
+
+            {/* Cart Icon */}
+            <button
+              onClick={() => setShowCart(true)}
+              className={`flex items-center justify-center w-9 h-9 rounded-xl border border-gray-200 bg-gray-50 hover:bg-indigo-50 text-base cursor-pointer transition-all duration-200 relative ${cartBounce ? "animate-bounce" : ""}`}
+              title="Cart"
+            >
+              🛒
+              {cart.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-indigo-600 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-full border-2 border-white min-w-[16px] text-center leading-none">
+                  {cart.length}
+                </span>
+              )}
+            </button>
+
+            {/* Sign Up / Sign In Button */}
+            <button
+              onClick={() => setShowLogin(true)}
+              title="Sign In / Sign Up"
+              className="flex items-center gap-1.5 bg-slate-900 hover:bg-indigo-600 text-white border-0 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all duration-200 cursor-pointer shadow-sm"
+            >
+              <span className="text-sm">👤</span>
+              <span className="hidden sm:flex">Sign Up / Sign In</span>
+            </button>
+          </div>
+        </nav>
+
+        {/* ── Chat / Welcome Area ── */}
         <main style={{ flex:1, overflowY:"auto", padding:"16px", display:"flex", flexDirection:"column", gap:18, maxWidth:860, margin:"0 auto", width:"100%" }}>
           {isEmpty ? (
             /* Welcome Screen */
