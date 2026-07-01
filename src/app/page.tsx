@@ -37,6 +37,13 @@ interface ChatMessage {
   query?: string;
 }
 
+interface User {
+  name: string;
+  email: string;
+  avatar?: string;
+  joinedAt?: string;
+}
+
 /* ─────────────────────────────────────────
    CSS-in-JS global styles
 ───────────────────────────────────────── */
@@ -476,47 +483,172 @@ function MessageBubble({ msg, onSortChange, onAddToCart }: {
 /* ─────────────────────────────────────────
    Login Modal
 ───────────────────────────────────────── */
-function LoginModal({ onClose }: { onClose: () => void }) {
+/* ─────────────────────────────────────────
+   Login Modal
+   ───────────────────────────────────────── */
+function LoginModal({ onClose, onLoginSuccess }: { onClose: () => void; onLoginSuccess: (user: User) => void }) {
   const [tab, setTab] = useState<"signin" | "signup">("signin");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!email.trim() || !password.trim()) {
+      setError("Please fill in all credentials.");
+      return;
+    }
+    if (tab === "signup" && !name.trim()) {
+      setError("Please enter your name.");
+      return;
+    }
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    const resolvedName = tab === "signup" ? name.trim() : email.split("@")[0];
+    const newUser: User = {
+      name: resolvedName,
+      email: email.trim(),
+      avatar: resolvedName.substring(0, 2).toUpperCase(),
+      joinedAt: new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+    };
+
+    localStorage.setItem("kapruka_user", JSON.stringify(newUser));
+    onLoginSuccess(newUser);
+    onClose();
+  };
+
   return (
     <div style={{ position:"fixed", inset:0, zIndex:200, background:"rgba(15,23,42,.55)", backdropFilter:"blur(6px)", display:"flex", alignItems:"center", justifyContent:"center", padding:16 }} onClick={onClose}>
-      <div className="scale-in" style={{ background:"#fff", borderRadius:24, width:"100%", maxWidth:420, overflow:"hidden", boxShadow:"0 25px 70px rgba(0,0,0,.18)" }} onClick={e => e.stopPropagation()}>
+      <form onSubmit={handleSubmit} className="scale-in" style={{ background:"#fff", borderRadius:24, width:"100%", maxWidth:420, overflow:"hidden", boxShadow:"0 25px 70px rgba(0,0,0,.18)" }} onClick={e => e.stopPropagation()}>
         <div style={{ display:"flex", borderBottom:"1px solid #f1f5f9" }}>
           {(["signin","signup"] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{ flex:1, padding:"16px 0", fontSize:14, fontWeight:700, border:"none", cursor:"pointer", background:"transparent", color: tab===t ? "#6366f1" : "#94a3b8", borderBottom: tab===t ? "2px solid #6366f1" : "2px solid transparent", transition:"all .18s" }}>
+            <button type="button" key={t} onClick={() => { setTab(t); setError(""); }} style={{ flex:1, padding:"16px 0", fontSize:14, fontWeight:700, border:"none", cursor:"pointer", background:"transparent", color: tab===t ? "#6366f1" : "#94a3b8", borderBottom: tab===t ? "2px solid #6366f1" : "2px solid transparent", transition:"all .18s" }}>
               {t==="signin" ? "Sign In" : "Sign Up"}
             </button>
           ))}
-          <button onClick={onClose} style={{ padding:"16px 18px", border:"none", background:"transparent", cursor:"pointer", color:"#94a3b8", fontSize:18 }}>✕</button>
+          <button type="button" onClick={onClose} style={{ padding:"16px 18px", border:"none", background:"transparent", cursor:"pointer", color:"#94a3b8", fontSize:18 }}>✕</button>
         </div>
         <div style={{ padding:24, display:"flex", flexDirection:"column", gap:14 }}>
-          {tab==="signup" && (
-            <div>
-              <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#64748b", marginBottom:6, textTransform:"uppercase", letterSpacing:"0.05em" }}>Full Name</label>
-              <input type="text" placeholder="Your name" style={{ width:"100%", padding:"11px 14px", borderRadius:12, border:"1.5px solid #e2e8f0", fontSize:14, outline:"none" }} />
+          {error && (
+            <div style={{ padding:"10px 14px", background:"#fef2f2", border:"1px solid #fecaca", borderRadius:12, fontSize:12, color:"#ef4444", fontWeight:600 }}>
+              ⚠️ {error}
             </div>
           )}
+
+          {tab === "signup" && (
+            <div>
+              <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#64748b", marginBottom:6, textTransform:"uppercase", letterSpacing:"0.05em" }}>Full Name</label>
+              <input type="text" placeholder="Your name" value={name} onChange={e => setName(e.target.value)} style={{ width:"100%", padding:"11px 14px", borderRadius:12, border:"1.5px solid #e2e8f0", fontSize:14, outline:"none" }} />
+            </div>
+          )}
+
           <div>
             <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#64748b", marginBottom:6, textTransform:"uppercase", letterSpacing:"0.05em" }}>Email</label>
-            <input type="email" placeholder="you@example.com" style={{ width:"100%", padding:"11px 14px", borderRadius:12, border:"1.5px solid #e2e8f0", fontSize:14, outline:"none" }} />
+            <input type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} style={{ width:"100%", padding:"11px 14px", borderRadius:12, border:"1.5px solid #e2e8f0", fontSize:14, outline:"none" }} />
           </div>
+
           <div>
             <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#64748b", marginBottom:6, textTransform:"uppercase", letterSpacing:"0.05em" }}>Password</label>
-            <input type="password" placeholder="••••••••" style={{ width:"100%", padding:"11px 14px", borderRadius:12, border:"1.5px solid #e2e8f0", fontSize:14, outline:"none" }} />
+            <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} style={{ width:"100%", padding:"11px 14px", borderRadius:12, border:"1.5px solid #e2e8f0", fontSize:14, outline:"none" }} />
           </div>
-          <button onClick={() => { alert(tab==="signin" ? "Signed in!" : "Account created!"); onClose(); }} style={{
+
+          <button type="submit" style={{
             border:"none", cursor:"pointer", padding:"14px 0", borderRadius:14, marginTop:4,
             background:"linear-gradient(135deg,#6366f1,#7c3aed)", color:"#fff",
             fontSize:15, fontWeight:700, boxShadow:"0 4px 18px rgba(99,102,241,.35)",
           }}>
             {tab==="signin" ? "Sign In" : "Create Account"}
           </button>
+          
           <p style={{ textAlign:"center", fontSize:12, color:"#64748b" }}>
             {tab==="signin" ? "No account? " : "Have an account? "}
-            <button onClick={() => setTab(tab==="signin"?"signup":"signin")} style={{ color:"#6366f1", fontWeight:700, border:"none", background:"none", cursor:"pointer" }}>
+            <button type="button" onClick={() => { setTab(tab==="signin"?"signup":"signin"); setError(""); }} style={{ color:"#6366f1", fontWeight:700, border:"none", background:"none", cursor:"pointer" }}>
               {tab==="signin" ? "Sign up" : "Sign in"}
             </button>
           </p>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
+   Profile Modal
+   ───────────────────────────────────────── */
+function ProfileModal({ user, onClose, onLogout }: { user: User; onClose: () => void; onLogout: () => void }) {
+  const orders = [
+    { id: "KP-78923", date: "Jul 1, 2026", status: "Delivered", items: "Karma Book + Cards Combo", total: "LKR 2,650" },
+    { id: "KP-78810", date: "Jun 28, 2026", status: "In Transit", items: "Ferrero Rocher Chocolate Mousse Cake", total: "LKR 10,500" }
+  ];
+
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:200, background:"rgba(15,23,42,.55)", backdropFilter:"blur(6px)", display:"flex", alignItems:"center", justifyContent:"center", padding:16 }} onClick={onClose}>
+      <div className="scale-in" style={{ background:"#fff", borderRadius:24, width:"100%", maxWidth:450, overflow:"hidden", boxShadow:"0 25px 70px rgba(0,0,0,.18)" }} onClick={e => e.stopPropagation()}>
+        <div style={{ padding:"20px 24px", borderBottom:"1px solid #f1f5f9", display:"flex", justifyContent:"space-between", alignItems:"center", background: "#f8fafc" }}>
+          <h2 style={{ fontSize:16, fontWeight:800, color:"#0f172a" }}>Your Profile</h2>
+          <button onClick={onClose} style={{ border:"none", background:"#e2e8f0", borderRadius:"50%", width:28, height:28, cursor:"pointer", color:"#475569", fontSize:14, display:"flex", alignItems:"center", justifyContent:"center" }}>✕</button>
+        </div>
+        <div style={{ padding: 24, display:"flex", flexDirection:"column", gap: 20 }}>
+          <div style={{ display:"flex", alignItems:"center", gap: 14 }}>
+            <div style={{ width: 56, height: 56, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, boxShadow: "0 4px 12px rgba(99,102,241,.3)" }}>
+              {user.avatar || "👤"}
+            </div>
+            <div>
+              <h3 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>{user.name}</h3>
+              <p style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>{user.email}</p>
+            </div>
+          </div>
+
+          <div style={{ border: "1px solid #e2e8f0", borderRadius: 16, padding: "14px 16px", background: "#fafafa" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b" }}>
+              <span>Membership</span>
+              <span style={{ color: "#22c55e", fontWeight: 700 }}>Kapruka Premium Friend</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b", marginTop: 8 }}>
+              <span>Joined</span>
+              <span style={{ color: "#0f172a", fontWeight: 600 }}>{user.joinedAt || "July 2026"}</span>
+            </div>
+          </div>
+
+          <div>
+            <h4 style={{ fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Recent Activity / Orders</h4>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {orders.map((o) => (
+                <div key={o.id} style={{ display:"flex", flexDirection:"column", gap: 4, border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, fontSize: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700 }}>
+                    <span style={{ color: "#4f46e5" }}>{o.id}</span>
+                    <span style={{ color: "#64748b" }}>{o.date}</span>
+                  </div>
+                  <div style={{ color: "#0f172a", marginTop: 2 }}>{o.items}</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, alignItems: "center" }}>
+                    <span style={{ fontWeight: 800 }}>{o.total}</span>
+                    <span style={{
+                      padding: "2px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700,
+                      background: o.status === "Delivered" ? "#d1fae5" : "#fef3c7",
+                      color: o.status === "Delivered" ? "#065f46" : "#92400e"
+                    }}>{o.status}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button onClick={() => { onLogout(); onClose(); }} style={{
+            border:"1px solid #fecaca", cursor:"pointer", padding:"12px 0", borderRadius:12,
+            background:"#fff", color:"#ef4444", fontSize:14, fontWeight:700,
+            transition: "all 0.2s"
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "#fef2f2"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}
+          >
+            Log Out Account
+          </button>
         </div>
       </div>
     </div>
@@ -720,6 +852,19 @@ export default function KaprukaChatApp() {
   const [isListening, setIsListening] = useState(false);
   const [cart, setCart] = useState<Product[]>([]);
   const [cartBounce, setCartBounce] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("kapruka_user");
+    if (saved) {
+      try {
+        setUser(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to load user state:", e);
+      }
+    }
+  }, []);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -865,7 +1010,14 @@ export default function KaprukaChatApp() {
       <style dangerouslySetInnerHTML={{ __html: GLOBAL_CSS }} />
       {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
 
-      <div className="flex flex-col h-full bg-gradient-to-br from-slate-50 to-blue-50 overflow-hidden" style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden", background:"linear-gradient(135deg, #f8fafc 0%, #e0f2fe 100%)" }}>
+      <div className="flex flex-col h-full bg-gradient-to-br from-slate-50 to-blue-50 overflow-hidden" style={{
+        position: "fixed",
+        inset: 0,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        background: "linear-gradient(135deg, #f0f4ff 0%, #fdf2ff 50%, #e0f2fe 100%)"
+      }}>
 
         {/* ── Permanent Sticky Navbar — always visible on mobile & desktop ── */}
         <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm" style={{
@@ -875,12 +1027,13 @@ export default function KaprukaChatApp() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          background: "rgba(255, 255, 255, 0.92)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          borderBottom: "1px solid #e2e8f0",
+          background: "rgba(255, 255, 255, 0.85)",
+          backdropFilter: "saturate(180%) blur(16px)",
+          WebkitBackdropFilter: "saturate(180%) blur(16px)",
+          borderBottom: "1px solid rgba(226, 232, 240, 0.8)",
           padding: "10px 14px",
-          boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.08)",
+          paddingTop: "calc(10px + env(safe-area-inset-top, 0px))",
+          boxShadow: "0 4px 20px -2px rgba(0, 0, 0, 0.05)",
           width: "100%",
           flexShrink: 0
         }}>
@@ -1006,28 +1159,56 @@ export default function KaprukaChatApp() {
                 )}
               </button>
 
-              {/* Sign Up / Sign In Button */}
-              <button
-                onClick={() => setShowLogin(true)}
-                title="Sign In / Sign Up"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  background: "#0f172a",
-                  color: "#fff",
-                  border: "none",
-                  padding: "8px 14px",
-                  borderRadius: "10px",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  boxShadow: "0 4px 6px rgba(0,0,0,0.1)"
-                }}
-              >
-                <span style={{ fontSize:"13px" }}>👤</span>
-                <span className="hidden sm:flex">Sign Up / Sign In</span>
-              </button>
+             {/* Sign Up / Sign In Button */}
+             {user ? (
+               <button
+                 onClick={() => setShowProfile(true)}
+                 title="View Profile"
+                 style={{
+                   display: "flex",
+                   alignItems: "center",
+                   gap: "6px",
+                   background: "linear-gradient(135deg, #4f46e5, #6366f1)",
+                   color: "#fff",
+                   border: "none",
+                   padding: "8px 14px",
+                   borderRadius: "10px",
+                   fontSize: "12px",
+                   fontWeight: 800,
+                   cursor: "pointer",
+                   boxShadow: "0 4px 12px rgba(79,70,229,0.3)",
+                   flexShrink: 0
+                 }}
+               >
+                 <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: "#fff", color: "#4f46e5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: 800 }}>
+                   {user.avatar || "👤"}
+                 </div>
+                 <span className="hidden sm:flex">{user.name}</span>
+               </button>
+             ) : (
+               <button
+                 onClick={() => setShowLogin(true)}
+                 title="Sign In / Sign Up"
+                 style={{
+                   display: "flex",
+                   alignItems: "center",
+                   gap: "6px",
+                   background: "#0f172a",
+                   color: "#fff",
+                   border: "none",
+                   padding: "8px 14px",
+                   borderRadius: "10px",
+                   fontSize: "12px",
+                   fontWeight: 800,
+                   cursor: "pointer",
+                   boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+                   flexShrink: 0
+                 }}
+               >
+                 <span style={{ fontSize:"13px" }}>👤</span>
+                 <span className="hidden sm:flex">Sign Up / Sign In</span>
+               </button>
+             )}
             </div>
           </div>
         </nav>
@@ -1167,7 +1348,8 @@ export default function KaprukaChatApp() {
       </div>
 
       {/* Modals */}
-      {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
+      {showLogin && <LoginModal onClose={() => setShowLogin(false)} onLoginSuccess={setUser} />}
+      {showProfile && user && <ProfileModal user={user} onClose={() => setShowProfile(false)} onLogout={() => { setUser(null); localStorage.removeItem("kapruka_user"); }} />}
       {showNotif && <NotifPanel onClose={() => setShowNotif(false)} />}
       {showCart && <CartPanel onClose={() => setShowCart(false)} cart={cart} onRemove={handleRemoveFromCart} />}
       {showImgSearch && (
